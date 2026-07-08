@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coulomb-matrix"
+version = "0.1.0"
+description = "Tools to compute Coulomb integrals from Wannier functions"
+authors = [ { name="A. Winka" } ]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "ase",
+    "gpaw",
+]
