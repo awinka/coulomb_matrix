@@ -1,40 +1,54 @@
 import itertools
+import pytest
 
 from coulomb_matrix.mpi_utils import compute_mpi_distribution
 
 
-def collect_pool_indices(mpi_size, num_wann, number_poisson_pools):
+def collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode="ijij"):
     pools = {}
     for rank in range(mpi_size):
-        dist = compute_mpi_distribution(mpi_size, rank, num_wann, number_poisson_pools)
-        pool = dist['poisson_pool']
-        pools.setdefault(pool, set()).update(dist['pool_wf_indices'])
+        dist = compute_mpi_distribution(
+            mpi_size, rank, num_wann, number_poisson_pools, mode=mode
+        )
+        pool = dist["poisson_pool"]
+        if mode == "ijij":
+            pools.setdefault(pool, set()).update(dist["pool_wf_indices"])
+        else:  # "ijji"
+            pools.setdefault(pool, set()).update(dist["pool_pair_indices"])
     return pools
 
 
-def test_pools_cover_all_indices():
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
+def test_pools_cover_all_indices(mode):
     mpi_size = 8
     num_wann = 20
     number_poisson_pools = 3
 
-    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools)
+    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode=mode)
     all_indices = set().union(*pools.values())
-    assert all_indices == set(range(num_wann))
+    reference_indices = (
+        set(range(num_wann))
+        if mode == "ijij"
+        else set((i, j) for i in range(num_wann) for j in range(num_wann))
+    )
+    assert all_indices == reference_indices
 
 
-def test_no_overlap_between_pools():
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
+def test_no_overlap_between_pools(mode):
     mpi_size = 7
     num_wann = 13
     number_poisson_pools = 4
 
-    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools)
+    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode=mode)
     # ensure pairwise disjoint
     sets = list(pools.values())
     for a, b in itertools.combinations(sets, 2):
         assert a.isdisjoint(b)
 
 
-def test_indices_within_bounds_and_consistent():
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
+def test_indices_within_bounds_and_consistent(mode):
     for mpi_size, num_wann, pools in [
         (1, 1, 1),
         (4, 10, 2),
@@ -42,21 +56,44 @@ def test_indices_within_bounds_and_consistent():
         (16, 5, 3),
     ]:
         for rank in range(mpi_size):
-            dist = compute_mpi_distribution(mpi_size, rank, num_wann, pools)
-            # indices are within global range
-            assert all(0 <= i < num_wann for i in dist['pool_wf_indices'])
-            assert all(0 <= i < num_wann for i in dist['rank_wf_indices'])
-            # no duplicates within assigned lists
-            assert len(dist['pool_wf_indices']) == len(set(dist['pool_wf_indices']))
-            assert len(dist['rank_wf_indices']) == len(set(dist['rank_wf_indices']))
+            dist = compute_mpi_distribution(mpi_size, rank, num_wann, pools, mode=mode)
+            if mode == "ijij":
+                # indices are within global range
+                assert all(0 <= i < num_wann for i in dist["pool_wf_indices"])
+                assert all(0 <= i < num_wann for i in dist["rank_wf_indices"])
+                # no duplicates within assigned lists
+                assert len(dist["pool_wf_indices"]) == len(set(dist["pool_wf_indices"]))
+                assert len(dist["rank_wf_indices"]) == len(set(dist["rank_wf_indices"]))
+            else:  # "ijji"
+                # indices are within global range
+                assert all(0 <= i < num_wann and 0 <= j < num_wann for i, j in dist["pool_pair_indices"])
+                # no duplicates within assigned lists
+                assert len(dist["pool_pair_indices"]) == len(set(dist["pool_pair_indices"]))
 
 
-def test_even_distribution_when_possible():
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
+def test_when_too_many_pools(mode):
+    mpi_size = 10
+    num_wann = 3
+    number_poisson_pools = 10
+
+    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode=mode)
+    # The number of pools should be reduced to the maximum possible, which is num_wann for "ijij" and num_wann*num_wann for "ijji"
+    expected_max_pools = num_wann if mode == "ijij" else num_wann * num_wann
+    assert len(pools) <= expected_max_pools
+
+
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
+def test_even_distribution_when_possible(mode):
     mpi_size = 6
     num_wann = 12
     number_poisson_pools = 3
 
-    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools)
+    pools = collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode=mode)
     sizes = [len(s) for s in pools.values()]
     # should be equal sized here
-    assert set(sizes) == {4}
+    if mode == "ijij":
+        assert set(sizes) == {4}
+    else:  # "ijji"
+        # For ijji, the number of pairs is num_wann*num_wann, which is 144. With 3 pools, each pool should ideally have 48 pairs.
+        assert set(sizes) == {48}
