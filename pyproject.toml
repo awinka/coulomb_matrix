@@ -15,3 +15,16 @@ dependencies = [
     "ase",
     "gpaw",
 ]
+
+# entry-points table
+[project.scripts]
+# Keep CLI names stable
+xsf-to-npy = "coulomb_matrix.commands:xsf_to_npy"
+coulomb-matrix = "coulomb_matrix.commands:coulomb_matrix"
+coulomb-exchange = "coulomb_matrix.commands:coulomb_exchange"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
