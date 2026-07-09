@@ -1,14 +1,17 @@
 """Console entry point implementations for the coulomb_matrix package.
 
-Provides: `xsf-to-npy`, `coulomb-v-ijij`, `coulomb-v-ijji` console scripts.
+Provides: `xsf-to-npy`, `coulomb-matrix`, `coulomb-exchange` console scripts.
 """
 import os
-import sys
 import argparse
 import glob
 import re
 import numpy as np
 from .xsf import Xsf2Np
+from .v_matrix import VCoulombCalculator
+from .j_matrix import JCoulombCalculator
+import gpaw.mpi as mpi
+from .eri_utils import uniquify
 
 
 def xsf_to_npy(argv=None):
@@ -58,21 +61,52 @@ def xsf_to_npy(argv=None):
     return 0
 
 
-def _run_script(script_name, argv=None):
-    raise RuntimeError("_run_script is no longer supported; call the package entry points directly")
-
-
-def coulomb_v_ijij(argv=None):
+def coulomb_matrix(argv=None):
     """Run the packaged create_coulomb_matrix implementation."""
-    from coulomb_matrix.create_coulomb_matrix import main as _main
-    return _main(argv)
+    parser = argparse.ArgumentParser(description="Compute the Coulomb matrix (V) from Wannier functions.")
+    parser.add_argument("--config", type=str, default=None, help="Path to TOML config file.")
+    args = parser.parse_args(argv)
+    calc = VCoulombCalculator(config_path=args.config)
+    V = calc.run()
+
+    # save by rank 0
+    if not mpi.world.rank:
+        output_cfg = calc.config.get("output", {})
+        save_dir = output_cfg.get("save_dir", "./")
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except Exception:
+            pass
+        filename = output_cfg.get("matrix_filename", "V_matrix.npy" if calc.mode == "V" else "J_matrix.npy")
+        path = os.path.join(save_dir, filename)
+        if output_cfg.get("use_unique_filenames", True):
+            path = uniquify(path)
+        np.save(path, V)
+    return 0
 
 
-def coulomb_v_ijji(argv=None):
-    """Run the packaged create_ijji_matrix implementation."""
-    from coulomb_matrix.ijji import main as _main
-    return _main(argv)
+def coulomb_exchange(argv=None):
+    """Run the packaged create_exchange_matrix implementation."""
+    parser = argparse.ArgumentParser(description="Compute J Coulomb matrix")
+    parser.add_argument("--xsf-dir", default="./", help="Directory for xsf files")
+    parser.add_argument("--npy-dir", default="./", help="Directory for npy files")
+    parser.add_argument("--config", default=None, help="Optional TOML config file")
+    args = parser.parse_args(argv)
+    calc = JCoulombCalculator(config_path=args.config, xsf_dir=args.xsf_dir, npy_dir=args.npy_dir)
+    V = calc.run()
 
+    # save by rank 0
+    if not mpi.world.rank:
+        output_cfg = calc.config.get("output", {})
+        save_dir = output_cfg.get("save_dir", "./")
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except Exception:
+            pass
+        filename = output_cfg.get("matrix_filename", "V_matrix.npy" if calc.mode == "V" else "J_matrix.npy")
+        path = os.path.join(save_dir, filename)
+        if output_cfg.get("use_unique_filenames", True):
+            path = uniquify(path)
+        np.save(path, V)
+    return 0
 
-if __name__ == "__main__":
-    xsf_to_npy()

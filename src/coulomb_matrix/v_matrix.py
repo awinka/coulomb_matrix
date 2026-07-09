@@ -1,20 +1,20 @@
-"""`ijij` Coulomb calculator subclass and CLI entrypoint.
+"""`V` Coulomb calculator subclass and CLI entrypoint.
 
-This module defines `CreateCoulombCalculator` which specializes
-`CoulombCalculatorBase` for the `ijij` mode and performs the
-post-run saving on MPI rank 0.
+Provides `VCoulombCalculator` and a `main()` entrypoint.
 """
 
+import argparse
+import os
 import numpy as np
 import gpaw.mpi as mpi
 from ase.units import Bohr
 from .coulomb_core import CoulombCalculatorBase
-from eri_utils import load_and_normalize_wf, shift_WF
+from .eri_utils import load_and_normalize_wf, shift_WF, uniquify
 
 
-class CreateCoulombCalculator(CoulombCalculatorBase):
+class VCoulombCalculator(CoulombCalculatorBase):
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("mode", "ijij")
+        kwargs.setdefault("mode", "V")
         super().__init__(*args, **kwargs)
 
     def run(self):
@@ -26,12 +26,14 @@ class CreateCoulombCalculator(CoulombCalculatorBase):
         for w_i in self.pool_wf_indices:
             wf_i = load_and_normalize_wf(self.npy_files[w_i], self.dV)
             # interpolate WF to Poisson grid
-            wf_i = self.map_wf_to_poisson(wf_i, method=self.interp_method)
+            wf_i = self.map_wf_to_poisson(wf_i, self.grid_full, method=self.interp_method)
 
             local_coulomb_potential[:] = 0.0
-            self.poisson.solve(local_coulomb_potential, wf_i.conj() * wf_i)
+            from gpaw.poisson import PoissonSolver as _PS
+            poisson_local = _PS(name="fast", nn=3)
+            poisson_local.set_grid_descriptor(self.GD)
+            poisson_local.solve(local_coulomb_potential, wf_i.conj() * wf_i)
 
-            # Check if this is really necessary or if gpaw provides functionality
             coulomb_potential_ii[:] = 0.0
             coulomb_potential_ii[self.GD.beg_c[0]:self.GD.end_c[0], self.GD.beg_c[1]:self.GD.end_c[1], self.GD.beg_c[2]:self.GD.end_c[2]] = local_coulomb_potential
             self.GD.comm.sum(coulomb_potential_ii)
@@ -43,7 +45,6 @@ class CreateCoulombCalculator(CoulombCalculatorBase):
                 for shift in np.ndindex(2 * self.Rx + 1, 2 * self.Ry + 1, 2 * self.Rz + 1):
                     shift = np.array([self.Rx, self.Ry, self.Rz]) - np.array(shift)
                     if np.array([(shift == s).all() for s in shift_list]).any():
-                        # Utilize symmetry to avoid redundant calculations
                         continue
                     wf_shifted_j = shift_WF(wf_j, shift[0] * self.n_grid_uc[0], shift[1] * self.n_grid_uc[1], shift[2] * self.n_grid_uc[2])
                     V[shift[0], shift[1], shift[2], w_i, w_j] = np.vdot(wf_shifted_j.conj() * wf_shifted_j, coulomb_potential_ii) * self.GD.dv
