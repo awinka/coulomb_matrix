@@ -140,16 +140,20 @@ class CoulombCalculatorBase:
             rank=self.rank,
             num_wann=self.num_wann,
             n_poisson_pools=int(self.mpi_cfg.get("number_poisson_pools", 1)),
+            mode=self.mode,
         )
 
-        self.pool_wf_indices = dist["pool_wf_indices"]
-        self.rank_wf_indices = dist["rank_wf_indices"]
+        if self.mode == "ijij":
+            self.pool_wf_indices = dist["pool_wf_indices"]
+            self.rank_wf_indices = dist["rank_wf_indices"]
+        elif self.mode == "ijji":
+            self.pool_pair_indices = dist["pool_pair_indices"]
         self.comm_poisson = self.comm.new_communicator(dist["comm_poisson_ranks"])
 
         # Build Poisson grid
         with open(self.xsf_files[0], "r") as xsf:
             wf_file = Xsf2Np(xsf)
-        self.pg = PoissonGrid(wf_file, self.comm_poisson, self.interaction_cfg, self.grid_cfg, mode=self.mode)
+        self.pg = PoissonGrid(wf_file, self.comm_poisson, self.interaction_cfg, self.grid_cfg)
 
         # Build Poisson solver
         self.poisson = PoissonSolver(name="fast", nn=3)
@@ -162,7 +166,10 @@ class CoulombCalculatorBase:
         self.grid = self.pg.grid
         self.grid_full = self.pg.grid_full
         self.map_wf_to_poisson = self.pg.map_wf_to_poisson
-        self.interp_method = "nearest" if self.mode == "ijij" else "linear"
+        # This should not matter. WF is just put on a larger grid with the same spacing, 
+        # so nearest neighbor interpolation should be sufficient. I believe it is faster than linear interpolation, 
+        # but this should be tested.
+        self.interp_method = "nearest" # or "linear"
 
     def run(self):
         raise NotImplementedError("Subclasses must implement run().")
