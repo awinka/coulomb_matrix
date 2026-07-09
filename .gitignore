@@ -1,0 +1,45 @@
+# Byte-compiled / CPython artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.cpython-*.so
+
+# Editable/install/build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Specific egg-info generated in this repo
+src/coulomb_matrix.egg-info/
+src/*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# pytest cache
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+
+# Development helper folder
+dev/
+
+# Misc
+.DS_Store
+*.log
+*~
+*.swp
