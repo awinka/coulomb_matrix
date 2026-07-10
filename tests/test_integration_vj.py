@@ -1,3 +1,9 @@
+"""
+Integration tests for the V and J matrix calculations.
+
+These tests should be run in an MPI environment, especially the test `test_v_and_j_run_consistent_across_pools`, 
+which checks that the results are consistent across different numbers of MPI pools. 
+"""
 import os
 import numpy as np
 import tomli_w
@@ -52,7 +58,7 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
 
     npy_glob, xsf_glob = _make_files(tmpdir, num_wann=num_wann, wf_shape=wf_shape)
 
-    world =mpi.world
+    world = mpi.world
     size = getattr(world, "size", 1)
     rank = getattr(world, "rank", 0)
     
@@ -66,7 +72,7 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     for pools in pool_choices:
         # write a small config file per pool setting
         cfg = {
-            "interaction": {"Rx": 0, "Ry": 0, "Rz": 0},
+            "interaction": {"Rx": 1, "Ry": 1, "Rz": 1},
             "mpi": {"number_poisson_pools": pools},
             "paths": {"xsf_dir": tmpdir, "npy_dir": tmpdir},
             "io": {"xsf_glob": xsf_glob, "npy_glob": npy_glob},
@@ -92,5 +98,39 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
 
     # only assert on rank 0
     if rank == 0:
-        for a in results[1:]:
-            assert np.allclose(a, results[0])
+        for pool in range(1, len(results)):
+            assert np.allclose(results[pool], results[0]), f"Results differ for pool setting {pool_choices[pool]} and mode {mode}"
+
+
+def test_same_diagonal(tmp_path):
+    """The diagonal elements of the V_ijij and V_ijji matrices should be the same."""
+    tmpdir = str(tmp_path)
+    num_wann = 3
+    wf_shape = (8, 8, 8)
+
+    npy_glob, xsf_glob = _make_files(tmpdir, num_wann=num_wann, wf_shape=wf_shape)
+
+    cfg = {
+        "interaction": {"Rx": 1, "Ry": 1, "Rz": 1},
+        "mpi": {"number_poisson_pools": 1},
+        "paths": {"xsf_dir": tmpdir, "npy_dir": tmpdir},
+        "io": {"xsf_glob": xsf_glob, "npy_glob": npy_glob},
+    }
+    cfg_path = os.path.join(tmpdir, "cfg.toml")
+    with open(cfg_path, "wb") as f:
+        f.write(tomli_w.dumps(cfg).encode())
+
+    from coulomb_matrix.v_matrix import VCoulombCalculator
+    from coulomb_matrix.j_matrix import JCoulombCalculator
+
+    v_calc = VCoulombCalculator(config_path=cfg_path)
+    j_calc = JCoulombCalculator(config_path=cfg_path)
+
+    V_ijij = v_calc.run()
+    V_ijji = j_calc.run()
+
+    # Compare diagonals
+    diag_ijij = np.diagonal(V_ijij[0,0,0], axis1=-2, axis2=-1)
+    diag_ijji = np.diagonal(V_ijji[0,0,0], axis1=-2, axis2=-1)
+
+    assert np.allclose(diag_ijij, diag_ijji), "Diagonal elements of V_ijij and V_ijji do not match."
