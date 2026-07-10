@@ -147,13 +147,13 @@ class CoulombCalculatorBase:
             lattice_vectors = wf_file.get_lattice_vectors()
             supercell_vectors = wf_file.get_supercell()
             real_space_grid = np.array(wf_file.get_real_space_grid())
-            self.comm.broadcast(lattice_vectors, 0)
-            self.comm.broadcast(supercell_vectors, 0)
-            self.comm.broadcast(real_space_grid, 0)
         else:
-            lattice_vectors = self.comm.broadcast(None, 0)
-            supercell_vectors = self.comm.broadcast(None, 0)
-            real_space_grid = self.comm.broadcast(None, 0)
+            lattice_vectors = np.zeros((3, 3), dtype=float)
+            supercell_vectors = np.zeros((3, 3), dtype=float)
+            real_space_grid = np.zeros((3,), dtype=int)
+        self.comm.broadcast(lattice_vectors, 0)
+        self.comm.broadcast(supercell_vectors, 0)
+        self.comm.broadcast(real_space_grid, 0)
 
         # Very slow initialization, can I make it faster?
         self.pg = PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, self.comm_poisson, self.interaction_cfg)
