@@ -172,8 +172,29 @@ class CoulombCalculatorBase:
 
         # Build Poisson solver
         # Very slow initialization, can I make it faster? 
-        self.poisson = PoissonSolver(name="fast", nn=3)
-        self.poisson.set_grid_descriptor(self.GD)
+        self.poisson_solver = PoissonSolver(name="fast", nn=3)
+        self.poisson_solver.set_grid_descriptor(self.GD)
+    
+    def solve_poisson(self, charge_density, global_potential=True):
+        """Solve Poisson equation for a given charge density.
+
+        Parameters
+        ----------
+            charge_density (np.ndarray): Charge density array on the Poisson grid.
+            global_potential (bool): Whether to compute the global potential. Default is True.
+
+        Returns
+        -------
+            np.ndarray: Potential array on the Poisson grid.
+        """
+        local_potential = self.GD.zeros()
+        self.poisson_solver.solve(local_potential, charge_density)
+        if global_potential:
+            potential = self.pg.map_local_to_global(local_potential)
+            self.comm_poisson.sum(potential)
+        else:
+            potential = local_potential
+        return potential
 
     def run(self):
         raise NotImplementedError("Subclasses must implement run().")

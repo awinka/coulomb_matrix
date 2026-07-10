@@ -78,3 +78,14 @@ class PoissonGrid:
             fill_value=0.0,
         )
         return interp(target_grid)
+    
+    def map_local_to_global(self, local_array: np.ndarray) -> np.ndarray:
+        """Map a local array (shape `n_grid`) to a global array (shape `n_grid_full`).
+
+        This is useful for MPI parallelization, where each rank may only have a local portion of the Poisson grid.
+        """
+        if local_array.shape != self.grid.shape[:3]:
+            raise ValueError(f"Expected local_array shape {tuple(self.grid.shape[:3])}, got {local_array.shape}")
+        global_array = self.GD.zeros(global_array=True)
+        global_array[self.GD.beg_c[0]:self.GD.end_c[0], self.GD.beg_c[1]:self.GD.end_c[1], self.GD.beg_c[2]:self.GD.end_c[2]] = local_array
+        return global_array

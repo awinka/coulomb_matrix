@@ -28,18 +28,12 @@ class JCoulombCalculator(CoulombCalculatorBase):
                 wf_j = load_and_normalize_wf(self.npy_files[w_j], self.dV)
                 wf_j = self.map_wf_to_poisson(wf_j, self.grid, method=self.interp_method)
                 self.prev_w_j = w_j
-            shift_list = []
+            # TODO: Could exploit symmetry here to avoid redundant calculations.
             for shift in np.ndindex(2 * self.Rx + 1, 2 * self.Ry + 1, 2 * self.Rz + 1):
                 shift = np.array([self.Rx, self.Ry, self.Rz]) - np.array(shift)
-                if np.array([(shift == s).all() for s in shift_list]).any():
-                    # Utilize symmetry to avoid redundant calculations
-                    continue
                 wf_shifted_j = shift_WF(wf_j, shift[0] * self.n_grid_uc[0], shift[1] * self.n_grid_uc[1], shift[2] * self.n_grid_uc[2])
-                local_coulomb_potential = self.GD.zeros()
-                self.poisson.solve(local_coulomb_potential, wf_i * wf_shifted_j.conj()) # , charge=None, zero_initial_phi=False)
-                V[shift[0], shift[1], shift[2], w_i, w_j] = np.vdot(wf_i * wf_shifted_j.conj(), local_coulomb_potential)
-                V[-shift[0], -shift[1], -shift[2], w_j, w_i] = V[shift[0], shift[1], shift[2], w_i, w_j]
-                shift_list.append(-shift)
+                local_coulomb_potential = self.solve_poisson(wf_i.conj() * wf_shifted_j, global_potential=False)
+                V[shift[0], shift[1], shift[2], w_i, w_j] = np.vdot(wf_i.conj() * wf_shifted_j, local_coulomb_potential) * self.GD.dv
 
         self.comm.sum(V)
         convert_to_ev(V)

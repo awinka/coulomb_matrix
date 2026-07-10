@@ -88,3 +88,31 @@ def test_map_wf_to_poisson_out_of_bounds_fills_zero(monkeypatch):
     target = np.vstack([target, np.array([[999.0, 999.0, 999.0]])])
     out = pg.map_wf_to_poisson(wf_array, target, method="linear")
     assert out[-1] == 0.0
+
+
+def test_map_local_to_global():
+    """
+    Test that the local grid coordinates are correctly mapped to global coordinates.
+
+    Note: This test should be tested with MPI.
+    """
+    import coulomb_matrix.grid_utils as gu
+    import gpaw.mpi as mpi
+
+    lattice_vectors = np.eye(3) * 1.0
+    supercell_vectors = np.eye(3) * 2.0
+    real_space_grid = (4, 4, 4)
+    comm = mpi.world
+    interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
+    pg = gu.PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg)
+
+    # create a local grid with a single point at (1,1,1)
+    local_grid = np.ones(pg.GD.n_c)
+    # Global reference is ones everywhere.
+    global_ref = np.ones(pg.GD.N_c)
+
+    global_grid = pg.map_local_to_global(local_grid)
+    # Have to sum over all ranks to get the global grid
+    comm.sum(global_grid)
+    
+    assert np.allclose(global_grid, global_ref)
