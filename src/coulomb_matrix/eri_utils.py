@@ -55,11 +55,3 @@ def convert_to_ev(V):
     e = 1.602176634e-19
     conversion_factor = e / (4 * np.pi * epsilon_0) * 1e10
     V *= conversion_factor
-
-
-if __name__ == "__main__":
-    comm = mpi.world
-    rank = comm.rank
-    mpi_size = mpi.world.size
-    if not rank:
-        print(mpi_size)
