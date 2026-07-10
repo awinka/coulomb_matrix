@@ -1,0 +1,10 @@
+# Development dependencies for formatting, linting, and testing
+black
+isort
+ruff
+flake8
+pytest
+pytest-cov
+tomli-w
+mpi4py
+just

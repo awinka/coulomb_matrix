@@ -28,3 +28,16 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "ruff",
+    "flake8",
+    "pytest",
+    "pytest-cov",
+    "tomli-w",
+    "mpi4py",
+    "just",
+]
