@@ -69,10 +69,10 @@ def compute_mpi_distribution(mpi_size: int, rank: int, num_wann: int, n_poisson_
         pool_end = min((poisson_pool + 1) * num_wann_per_pool, num_wann)
         pool_wf_indices = list(range(pool_start, pool_end))
 
-        num_wann_per_rank = math.ceil(len(pool_wf_indices) / max(1, len(comm_poisson_ranks)))
+        num_wann_per_rank = math.ceil(num_wann / max(1, len(comm_poisson_ranks)))
         rank_start = new_rank * num_wann_per_rank
-        rank_end = min((new_rank + 1) * num_wann_per_rank, len(pool_wf_indices))
-        rank_wf_indices = [pool_wf_indices[i] for i in range(rank_start, rank_end)]
+        rank_end = min((new_rank + 1) * num_wann_per_rank, num_wann)
+        rank_wf_indices = [i for i in range(rank_start, rank_end)]
         return_dict.update(
             {
                 "num_wann_per_pool": num_wann_per_pool,

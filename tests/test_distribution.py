@@ -1,3 +1,6 @@
+"""
+Some tests are probably superfluous (thanks though copilot), so in the future this file can be cleaned up
+"""
 import itertools
 import pytest
 
@@ -18,6 +21,19 @@ def collect_pool_indices(mpi_size, num_wann, number_poisson_pools, mode="ijij"):
     return pools
 
 
+def collect_rank_indices(mpi_size, num_wann, number_poisson_pools):
+    # This is specific for the "ijij" mode, as "ijji" does not have rank_wf_indices
+    ranks = {}
+    poisson_pools = {}
+    for rank in range(mpi_size):
+        dist = compute_mpi_distribution(
+            mpi_size, rank, num_wann, number_poisson_pools, mode="ijij"
+        )
+        poisson_pools[rank] = dist["poisson_pool"]
+        ranks[rank] = dist["rank_wf_indices"]
+    return ranks, poisson_pools
+
+
 @pytest.mark.parametrize("mode", ["ijij", "ijji"])
 def test_pools_cover_all_indices(mode):
     mpi_size = 8
@@ -34,6 +50,22 @@ def test_pools_cover_all_indices(mode):
     assert all_indices == reference_indices
 
 
+def test_ranks_cover_all_indices():
+    mpi_size = 6
+    num_wann = 12
+    number_poisson_pools = 3
+
+    ranks, poisson_pools = collect_rank_indices(mpi_size, num_wann, number_poisson_pools)
+    for pool in range(number_poisson_pools):
+        # Extract ranks that belong to this pool
+        pool_ranks = [rank for rank, p in poisson_pools.items() if p == pool]
+        # Collect all indices assigned to these ranks
+        pool_indices = set().union(*(ranks[rank] for rank in pool_ranks))
+        # Ensure that the rank indices within each pool span the range of all Wannier functions
+        reference_indices = set(range(num_wann))
+        assert pool_indices == reference_indices
+
+
 @pytest.mark.parametrize("mode", ["ijij", "ijji"])
 def test_no_overlap_between_pools(mode):
     mpi_size = 7
@@ -45,6 +77,21 @@ def test_no_overlap_between_pools(mode):
     sets = list(pools.values())
     for a, b in itertools.combinations(sets, 2):
         assert a.isdisjoint(b)
+
+def test_no_overlap_between_ranks():
+    mpi_size = 5
+    num_wann = 10
+    number_poisson_pools = 2
+
+    ranks, poisson_pools = collect_rank_indices(mpi_size, num_wann, number_poisson_pools)
+    for pool in range(number_poisson_pools):
+        # Extract ranks that belong to this pool
+        pool_ranks = [rank for rank, p in poisson_pools.items() if p == pool]
+        # Collect all indices assigned to these ranks
+        rank_indices = [ranks[rank] for rank in pool_ranks]
+        # ensure pairwise disjoint
+        for a, b in itertools.combinations(rank_indices, 2):
+            assert set(a).isdisjoint(set(b))
 
 
 @pytest.mark.parametrize("mode", ["ijij", "ijji"])
