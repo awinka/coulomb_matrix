@@ -3,10 +3,11 @@
 
 Renamed for clarity and packaged under `coulomb_matrix.eri_utils`.
 """
-from ase.units import Bohr
-import numpy as np
 import os
+
 import gpaw.mpi as mpi
+import numpy as np
+from ase.units import Bohr
 
 
 def shift_WF(x, nx, ny, nz):

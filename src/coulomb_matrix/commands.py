@@ -2,31 +2,45 @@
 
 Provides: `xsf-to-npy`, `coulomb-matrix`, `coulomb-exchange` console scripts.
 """
-import os
 import argparse
 import glob
+import os
 import re
 import time
-import numpy as np
-from .xsf import Xsf2Np
-from .v_matrix import VCoulombCalculator
-from .j_matrix import JCoulombCalculator
+
 import gpaw.mpi as mpi
+import numpy as np
+
 from .eri_utils import uniquify
+from .j_matrix import JCoulombCalculator
+from .v_matrix import VCoulombCalculator
+from .xsf import Xsf2Np
 
 
 def xsf_to_npy(argv=None):
     """Entry point for converting .xsf files to .npy"""
-    parser = argparse.ArgumentParser(description="Convert .xsf Wannier functions to .npy files")
-    parser.add_argument("--pattern", default="*.xsf", help="Glob pattern to find xsf files (default '*.xsf')")
-    parser.add_argument("--out-prefix", default=None, help="Prefix for output npy filenames")
+    parser = argparse.ArgumentParser(
+        description="Convert .xsf Wannier functions to .npy files"
+    )
+    parser.add_argument(
+        "--pattern",
+        default="*.xsf",
+        help="Glob pattern to find xsf files (default '*.xsf')",
+    )
+    parser.add_argument(
+        "--out-prefix", default=None, help="Prefix for output npy filenames"
+    )
     parser.add_argument("--out-dir", default=None, help="Directory to write .npy files")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing .npy files")
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing .npy files"
+    )
     args = parser.parse_args(argv)
 
     def find_files(pattern):
         files = glob.glob(pattern)
-        files.sort(key=lambda x: int(re.findall(r"\d+", x)[0]) if re.findall(r"\d+", x) else x)
+        files.sort(
+            key=lambda x: int(re.findall(r"\d+", x)[0]) if re.findall(r"\d+", x) else x
+        )
         return files
 
     def convert_file(path, out_prefix=None, out_dir=None, overwrite=False):
@@ -55,7 +69,12 @@ def xsf_to_npy(argv=None):
         return 1
     for p in files:
         try:
-            out = convert_file(p, out_prefix=args.out_prefix, out_dir=args.out_dir, overwrite=args.overwrite)
+            out = convert_file(
+                p,
+                out_prefix=args.out_prefix,
+                out_dir=args.out_dir,
+                overwrite=args.overwrite,
+            )
             print("Wrote:", out)
         except Exception as e:
             print(f"Failed {p}: {e}")
@@ -65,8 +84,12 @@ def xsf_to_npy(argv=None):
 def coulomb_matrix(argv=None):
     """Run the packaged create_coulomb_matrix implementation."""
     os.environ["OMP_NUM_THREADS"] = "1"  # GPAW warning suggests OMP_NUM_THREADS=1
-    parser = argparse.ArgumentParser(description="Compute the Coulomb matrix (V) from Wannier functions.")
-    parser.add_argument("--config", type=str, default=None, help="Path to TOML config file.")
+    parser = argparse.ArgumentParser(
+        description="Compute the Coulomb matrix (V) from Wannier functions."
+    )
+    parser.add_argument(
+        "--config", type=str, default=None, help="Path to TOML config file."
+    )
     args = parser.parse_args(argv)
 
     # Time calculation
@@ -79,14 +102,20 @@ def coulomb_matrix(argv=None):
     calc = VCoulombCalculator(config_path=args.config)
     mpi.world.barrier()  # Ensure all processes reach this point before timing
     if mpi.world.rank == 0:
-        print(f"VCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds", flush=True)
+        print(
+            f"VCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds",
+            flush=True,
+        )
         # Time the run
         print("Running VCoulombCalculator...", flush=True)
         run_start_time = time.time()
     V = calc.run()
     mpi.world.barrier()  # Ensure all processes finish before timing
     if mpi.world.rank == 0:
-        print(f"VCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds", flush=True)
+        print(
+            f"VCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds",
+            flush=True,
+        )
         # Time the save
         print("Saving results...", flush=True)
         save_start_time = time.time()
@@ -102,8 +131,13 @@ def coulomb_matrix(argv=None):
         if output_cfg.get("use_unique_filenames", True):
             path = uniquify(path)
         np.save(path, V)
-        print(f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True)
-        print(f"Total time for Coulomb matrix calculation: {time.time() - start_time:.2f} seconds", flush=True)
+        print(
+            f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True
+        )
+        print(
+            f"Total time for Coulomb matrix calculation: {time.time() - start_time:.2f} seconds",
+            flush=True,
+        )
     return 0
 
 
@@ -125,14 +159,20 @@ def coulomb_exchange(argv=None):
     calc = JCoulombCalculator(config_path=args.config)
     mpi.world.barrier()  # Ensure all processes reach this point before timing
     if mpi.world.rank == 0:
-        print(f"JCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds", flush=True)
+        print(
+            f"JCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds",
+            flush=True,
+        )
         # Time the run
         print("Running JCoulombCalculator...", flush=True)
         run_start_time = time.time()
     V = calc.run()
     mpi.world.barrier()  # Ensure all processes finish before timing
     if mpi.world.rank == 0:
-        print(f"JCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds", flush=True)
+        print(
+            f"JCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds",
+            flush=True,
+        )
         # Time the save
         print("Saving results...", flush=True)
         save_start_time = time.time()
@@ -148,7 +188,11 @@ def coulomb_exchange(argv=None):
         if output_cfg.get("use_unique_filenames", True):
             path = uniquify(path)
         np.save(path, V)
-        print(f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True)
-        print(f"Total time for exchange Coulomb matrix calculation: {time.time() - start_time:.2f} seconds", flush=True)
+        print(
+            f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True
+        )
+        print(
+            f"Total time for exchange Coulomb matrix calculation: {time.time() - start_time:.2f} seconds",
+            flush=True,
+        )
     return 0
-

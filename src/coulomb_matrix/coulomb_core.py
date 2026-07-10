@@ -4,16 +4,18 @@ This module provides `load_config` and `CoulombCalculatorBase` which
 encapsulates the common MPI/grid/IO setup. Mode-specific behavior is
 implemented as two helper methods inside the class.
 """
-from pathlib import Path
-import numpy as np
-import tomllib
 import glob
 import re
+from pathlib import Path
+
 import gpaw.mpi as mpi
+import numpy as np
+import tomllib
 from gpaw.poisson import PoissonSolver
-from .xsf import Xsf2Np
-from .mpi_utils import compute_mpi_distribution
+
 from .grid_utils import PoissonGrid
+from .mpi_utils import compute_mpi_distribution
+from .xsf import Xsf2Np
 
 
 def load_config(config_path):
@@ -116,7 +118,9 @@ class CoulombCalculatorBase:
         self.xsf_files = glob.glob(str(xsf_path) + "/" + str(pattern_xsf))
         self.xsf_files.sort(key=lambda x: int(re.findall(r"\d+", x)[0]))
         if self.npy_files == [] or self.xsf_files == []:
-            raise ValueError(f"No npy or xsf files found in {xsf_path.expanduser()} or {npy_path.expanduser()} with pattern {pattern_xsf} or {pattern_npy}.")
+            raise ValueError(
+                f"No npy or xsf files found in {xsf_path.expanduser()} or {npy_path.expanduser()} with pattern {pattern_xsf} or {pattern_npy}."
+            )
 
         self.Rx = int(self.interaction_cfg.get("Rx", 0))
         self.Ry = int(self.interaction_cfg.get("Ry", 0))
@@ -156,7 +160,13 @@ class CoulombCalculatorBase:
         self.comm.broadcast(real_space_grid, 0)
 
         # Very slow initialization, can I make it faster?
-        self.pg = PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, self.comm_poisson, self.interaction_cfg)
+        self.pg = PoissonGrid(
+            lattice_vectors,
+            supercell_vectors,
+            real_space_grid,
+            self.comm_poisson,
+            self.interaction_cfg,
+        )
 
         # commonly used objects
         self.dV = self.pg.dV
@@ -165,16 +175,16 @@ class CoulombCalculatorBase:
         self.grid = self.pg.grid
         self.grid_full = self.pg.grid_full
         self.map_wf_to_poisson = self.pg.map_wf_to_poisson
-        # This should not matter. WF is just put on a larger grid with the same spacing, 
-        # so nearest neighbor interpolation should be sufficient. I believe it is faster than linear interpolation, 
+        # This should not matter. WF is just put on a larger grid with the same spacing,
+        # so nearest neighbor interpolation should be sufficient. I believe it is faster than linear interpolation,
         # but this should be tested.
-        self.interp_method = "nearest" # or "linear"
+        self.interp_method = "nearest"  # or "linear"
 
         # Build Poisson solver
-        # Very slow initialization, can I make it faster? 
+        # Very slow initialization, can I make it faster?
         self.poisson_solver = PoissonSolver(name="fast", nn=3)
         self.poisson_solver.set_grid_descriptor(self.GD)
-    
+
     def solve_poisson(self, charge_density, global_potential=True):
         """Solve Poisson equation for a given charge density.
 

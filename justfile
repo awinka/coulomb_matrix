@@ -8,7 +8,7 @@
 set shell := ["bash", "-cu"]
 
 # default number of MPI ranks for MPI test target
-N := 4
+N := "4"
 
 default: tests
 

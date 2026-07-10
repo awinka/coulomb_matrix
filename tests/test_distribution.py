@@ -2,6 +2,7 @@
 Some tests are probably superfluous (thanks though copilot), so in the future this file can be cleaned up
 """
 import itertools
+
 import pytest
 
 from coulomb_matrix.mpi_utils import compute_mpi_distribution
@@ -55,7 +56,9 @@ def test_ranks_cover_all_indices():
     num_wann = 12
     number_poisson_pools = 3
 
-    ranks, poisson_pools = collect_rank_indices(mpi_size, num_wann, number_poisson_pools)
+    ranks, poisson_pools = collect_rank_indices(
+        mpi_size, num_wann, number_poisson_pools
+    )
     for pool in range(number_poisson_pools):
         # Extract ranks that belong to this pool
         pool_ranks = [rank for rank, p in poisson_pools.items() if p == pool]
@@ -78,12 +81,15 @@ def test_no_overlap_between_pools(mode):
     for a, b in itertools.combinations(sets, 2):
         assert a.isdisjoint(b)
 
+
 def test_no_overlap_between_ranks():
     mpi_size = 5
     num_wann = 10
     number_poisson_pools = 2
 
-    ranks, poisson_pools = collect_rank_indices(mpi_size, num_wann, number_poisson_pools)
+    ranks, poisson_pools = collect_rank_indices(
+        mpi_size, num_wann, number_poisson_pools
+    )
     for pool in range(number_poisson_pools):
         # Extract ranks that belong to this pool
         pool_ranks = [rank for rank, p in poisson_pools.items() if p == pool]
@@ -113,9 +119,14 @@ def test_indices_within_bounds_and_consistent(mode):
                 assert len(dist["rank_wf_indices"]) == len(set(dist["rank_wf_indices"]))
             else:  # "ijji"
                 # indices are within global range
-                assert all(0 <= i < num_wann and 0 <= j < num_wann for i, j in dist["pool_pair_indices"])
+                assert all(
+                    0 <= i < num_wann and 0 <= j < num_wann
+                    for i, j in dist["pool_pair_indices"]
+                )
                 # no duplicates within assigned lists
-                assert len(dist["pool_pair_indices"]) == len(set(dist["pool_pair_indices"]))
+                assert len(dist["pool_pair_indices"]) == len(
+                    set(dist["pool_pair_indices"])
+                )
 
 
 @pytest.mark.parametrize("mode", ["ijij", "ijji"])

@@ -1,8 +1,15 @@
 import math
+
 import numpy as np
 
 
-def compute_mpi_distribution(mpi_size: int, rank: int, num_wann: int, n_poisson_pools: int | None = None, mode: str = "ijij"):
+def compute_mpi_distribution(
+    mpi_size: int,
+    rank: int,
+    num_wann: int,
+    n_poisson_pools: int | None = None,
+    mode: str = "ijij",
+):
     """Compute distribution of Wannier-function indices across MPI ranks.
 
     Parameters
@@ -38,19 +45,29 @@ def compute_mpi_distribution(mpi_size: int, rank: int, num_wann: int, n_poisson_
     # Instead of raising an error, we will just reduce the number of pools to the maximum possible.
     # We should however warn the user that they requested more pools than possible.
     if n_poisson_pools > mpi_size:
-        print(f"Warning: Requested {n_poisson_pools} Poisson pools, but only {mpi_size} MPI ranks are available. Reducing to {mpi_size}.")
+        print(
+            f"Warning: Requested {n_poisson_pools} Poisson pools, but only {mpi_size} MPI ranks are available. Reducing to {mpi_size}."
+        )
     if mode == "ijij" and n_poisson_pools > num_wann:
-        print(f"Warning: Requested {n_poisson_pools} Poisson pools, but only {num_wann} Wannier functions are available. Reducing to {num_wann}.")
+        print(
+            f"Warning: Requested {n_poisson_pools} Poisson pools, but only {num_wann} Wannier functions are available. Reducing to {num_wann}."
+        )
     if mode == "ijji" and n_poisson_pools > num_wann * num_wann:
-        print(f"Warning: Requested {n_poisson_pools} Poisson pools, but only {num_wann * num_wann} ij pairs are available. Reducing to {num_wann * num_wann}.")
+        print(
+            f"Warning: Requested {n_poisson_pools} Poisson pools, but only {num_wann * num_wann} ij pairs are available. Reducing to {num_wann * num_wann}."
+        )
 
-    n_poisson_pools = min(n_poisson_pools, mpi_size, num_wann if mode == "ijij" else num_wann * num_wann)
+    n_poisson_pools = min(
+        n_poisson_pools, mpi_size, num_wann if mode == "ijij" else num_wann * num_wann
+    )
 
     ranks_per_pool = math.ceil(mpi_size / n_poisson_pools)
     poisson_pool = rank // ranks_per_pool
 
     # ranks that belong to this poisson pool
-    comm_poisson_ranks = [q for q in range(mpi_size) if q // ranks_per_pool == poisson_pool]
+    comm_poisson_ranks = [
+        q for q in range(mpi_size) if q // ranks_per_pool == poisson_pool
+    ]
     try:
         new_rank = comm_poisson_ranks.index(rank)
     except ValueError:
@@ -64,7 +81,9 @@ def compute_mpi_distribution(mpi_size: int, rank: int, num_wann: int, n_poisson_
     }
 
     if mode == "ijij":
-        num_wann_per_pool = math.ceil(num_wann / n_poisson_pools) if n_poisson_pools else num_wann
+        num_wann_per_pool = (
+            math.ceil(num_wann / n_poisson_pools) if n_poisson_pools else num_wann
+        )
         pool_start = poisson_pool * num_wann_per_pool
         pool_end = min((poisson_pool + 1) * num_wann_per_pool, num_wann)
         pool_wf_indices = list(range(pool_start, pool_end))
@@ -83,11 +102,17 @@ def compute_mpi_distribution(mpi_size: int, rank: int, num_wann: int, n_poisson_
         )
 
     elif mode == "ijji":
-        num_pairs_per_pool = math.ceil(num_wann * num_wann / n_poisson_pools) if n_poisson_pools else num_wann * num_wann
+        num_pairs_per_pool = (
+            math.ceil(num_wann * num_wann / n_poisson_pools)
+            if n_poisson_pools
+            else num_wann * num_wann
+        )
         pool_start = poisson_pool * num_pairs_per_pool
         pool_end = min((poisson_pool + 1) * num_pairs_per_pool, num_wann * num_wann)
         wf_indices = np.ndindex(num_wann, num_wann)
-        pool_pair_indices = [pair for i, pair in enumerate(wf_indices) if pool_start <= i < pool_end]
+        pool_pair_indices = [
+            pair for i, pair in enumerate(wf_indices) if pool_start <= i < pool_end
+        ]
         return_dict.update(
             {
                 "num_pairs_per_pool": num_pairs_per_pool,

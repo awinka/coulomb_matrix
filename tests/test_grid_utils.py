@@ -19,7 +19,9 @@ class _FakeGD:
 
     def get_grid_point_coordinates(self, global_array=False):
         nx, ny, nz = self.shape
-        X, Y, Z = np.meshgrid(np.arange(nx), np.arange(ny), np.arange(nz), indexing="ij")
+        X, Y, Z = np.meshgrid(
+            np.arange(nx), np.arange(ny), np.arange(nz), indexing="ij"
+        )
         return X.astype(float), Y.astype(float), Z.astype(float)
 
 
@@ -35,7 +37,9 @@ def test_poissongrid_basic_properties(monkeypatch):
     comm = None
     interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
 
-    pg = gu.PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg)
+    pg = gu.PoissonGrid(
+        lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
+    )
 
     # basic numeric properties
     assert isinstance(pg.dV, float) and pg.dV > 0
@@ -54,7 +58,9 @@ def test_map_wf_to_poisson_nearest_preserves_point(monkeypatch):
     real_space_grid = (6, 6, 6)
     comm = None
     interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
-    pg = gu.PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg)
+    pg = gu.PoissonGrid(
+        lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
+    )
 
     # create a WF with a single spike at (1,2,3)
     wf_array = np.zeros(tuple(pg.wf_grid))
@@ -79,7 +85,9 @@ def test_map_wf_to_poisson_out_of_bounds_fills_zero(monkeypatch):
     real_space_grid = (4, 4, 4)
     comm = None
     interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
-    pg = gu.PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg)
+    pg = gu.PoissonGrid(
+        lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
+    )
 
     wf_array = np.ones(tuple(pg.wf_grid))
 
@@ -96,15 +104,18 @@ def test_map_local_to_global():
 
     Note: This test should be tested with MPI.
     """
-    import coulomb_matrix.grid_utils as gu
     import gpaw.mpi as mpi
+
+    import coulomb_matrix.grid_utils as gu
 
     lattice_vectors = np.eye(3) * 1.0
     supercell_vectors = np.eye(3) * 2.0
     real_space_grid = (4, 4, 4)
     comm = mpi.world
     interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
-    pg = gu.PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg)
+    pg = gu.PoissonGrid(
+        lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
+    )
 
     # create a local grid with a single point at (1,1,1)
     local_grid = np.ones(pg.GD.n_c)
@@ -114,5 +125,5 @@ def test_map_local_to_global():
     global_grid = pg.map_local_to_global(local_grid)
     # Have to sum over all ranks to get the global grid
     comm.sum(global_grid)
-    
+
     assert np.allclose(global_grid, global_ref)

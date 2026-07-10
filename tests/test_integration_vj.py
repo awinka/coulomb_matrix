@@ -5,10 +5,11 @@ These tests should be run in an MPI environment, especially the test `test_v_and
 which checks that the results are consistent across different numbers of MPI pools. 
 """
 import os
-import numpy as np
-import tomli_w
-import pytest
+
 import gpaw.mpi as mpi
+import numpy as np
+import pytest
+import tomli_w
 
 
 def _write_xsf(path, nx, ny, nz):
@@ -23,7 +24,11 @@ def _write_xsf(path, nx, ny, nz):
         f.write(f"{nx} {ny} {nz}\n")
         f.write("0.0 0.0 0.0\n")
         for i in range(3):
-            f.write("1.0 0.0 0.0\n" if i == 0 else ("0.0 1.0 0.0\n" if i == 1 else "0.0 0.0 1.0\n"))
+            f.write(
+                "1.0 0.0 0.0\n"
+                if i == 0
+                else ("0.0 1.0 0.0\n" if i == 1 else "0.0 0.0 1.0\n")
+            )
         # write some data values (nx*ny*nz floats)
         vals = [str(float(i % 6)) for i in range(nx * ny * nz)]
         for i in range(0, len(vals), 6):
@@ -48,12 +53,12 @@ def _make_files(tmpdir, num_wann=3, wf_shape=(4, 4, 4)):
     return npy_glob, xsf_glob
 
 
-#@pytest.mark.integration
+# @pytest.mark.integration
 @pytest.mark.parametrize("mode", ["ijij", "ijji"])
 def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     tmpdir = str(tmp_path)
     num_wann = 3
-    #wf_shape = (4, 4, 4)
+    # wf_shape = (4, 4, 4)
     wf_shape = (8, 8, 8)
 
     npy_glob, xsf_glob = _make_files(tmpdir, num_wann=num_wann, wf_shape=wf_shape)
@@ -61,7 +66,7 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     world = mpi.world
     size = getattr(world, "size", 1)
     rank = getattr(world, "rank", 0)
-    
+
     # try several pool values up to size (or 2)
     pool_choices = [1]
     if size >= 2:
@@ -99,7 +104,9 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     # only assert on rank 0
     if rank == 0:
         for pool in range(1, len(results)):
-            assert np.allclose(results[pool], results[0]), f"Results differ for pool setting {pool_choices[pool]} and mode {mode}"
+            assert np.allclose(
+                results[pool], results[0]
+            ), f"Results differ for pool setting {pool_choices[pool]} and mode {mode}"
 
 
 def test_same_diagonal(tmp_path):
@@ -120,8 +127,8 @@ def test_same_diagonal(tmp_path):
     with open(cfg_path, "wb") as f:
         f.write(tomli_w.dumps(cfg).encode())
 
-    from coulomb_matrix.v_matrix import VCoulombCalculator
     from coulomb_matrix.j_matrix import JCoulombCalculator
+    from coulomb_matrix.v_matrix import VCoulombCalculator
 
     v_calc = VCoulombCalculator(config_path=cfg_path)
     j_calc = JCoulombCalculator(config_path=cfg_path)
@@ -130,7 +137,9 @@ def test_same_diagonal(tmp_path):
     V_ijji = j_calc.run()
 
     # Compare diagonals
-    diag_ijij = np.diagonal(V_ijij[0,0,0], axis1=-2, axis2=-1)
-    diag_ijji = np.diagonal(V_ijji[0,0,0], axis1=-2, axis2=-1)
+    diag_ijij = np.diagonal(V_ijij[0, 0, 0], axis1=-2, axis2=-1)
+    diag_ijji = np.diagonal(V_ijji[0, 0, 0], axis1=-2, axis2=-1)
 
-    assert np.allclose(diag_ijij, diag_ijji), "Diagonal elements of V_ijij and V_ijji do not match."
+    assert np.allclose(
+        diag_ijij, diag_ijji
+    ), "Diagonal elements of V_ijij and V_ijji do not match."
