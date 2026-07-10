@@ -5,6 +5,7 @@ encapsulates the common MPI/grid/IO setup. Mode-specific behavior is
 implemented as two helper methods inside the class.
 """
 from pathlib import Path
+import numpy as np
 import tomllib
 import glob
 import re
@@ -22,9 +23,11 @@ def load_config(config_path):
         if not config_file.exists():
             raise FileNotFoundError(f"Config file not found: {config_file}")
     else:
-        default_path = Path(__file__).with_name("coulomb_config.toml")
+        default_path = Path.cwd() / "coulomb_config.toml"
         if default_path.exists():
             config_file = default_path.resolve()
+
+    config_dir = config_file.parent if config_file else Path.cwd()
 
     raw_config = {}
     if config_file is not None:
@@ -35,20 +38,18 @@ def load_config(config_path):
 
     # Lightweight validation / normalization
     interaction = config.get("interaction", {})
-    grid = config.get("grid", {})
     mpi_cfg = config.get("mpi", {})
     paths = config.get("paths", {})
     io_cfg = config.get("io", {})
     output = config.get("output", {})
-    runtime = config.get("runtime", {})
 
     for key in ("Rx", "Ry", "Rz"):
         if key in interaction:
             interaction[key] = int(interaction[key])
-            if interaction[key] < 1:
-                raise ValueError(f"Config field 'interaction.{key}' must be >= 1.")
+            if interaction[key] < 0:
+                raise ValueError(f"Config field 'interaction.{key}' must be >= 0.")
         else:
-            interaction[key] = 1
+            interaction[key] = 0
 
     # remove resolution handling; grids will be derived directly from XSF data
 
@@ -56,25 +57,26 @@ def load_config(config_path):
     if mpi_cfg["number_poisson_pools"] < 1:
         raise ValueError("Config field 'mpi.number_poisson_pools' must be >= 1.")
 
-    runtime["perform_checks"] = bool(runtime.get("perform_checks", False))
-    runtime["omp_num_threads"] = int(runtime.get("omp_num_threads", 1))
-    output["use_unique_filenames"] = bool(output.get("use_unique_filenames", True))
+    output["use_unique_filenames"] = bool(output.get("use_unique_filenames", False))
 
-    # Ensure paths/IO strings exist (may be empty if user relies on defaults)
-    for section in (paths, output, io_cfg):
+    # Ensure paths strings exist (may be empty if user relies on defaults)
+    for section in (paths, output):
         for k, v in list(section.items()):
             if isinstance(v, str):
-                section[k] = v.strip()
+                # section[k] = Path(v).expanduser().resolve() if v else config_dir
+                section[k] = Path(v) if v else config_dir
+                if not section[k].is_absolute():
+                    # Join the config folder path with the relative path, then normalize it
+                    absolute_input_path = (config_dir / section[k]).resolve()
+                    section[k] = absolute_input_path
 
     config.update(
         {
             "interaction": interaction,
-            "grid": grid,
             "mpi": mpi_cfg,
             "paths": paths,
             "io": io_cfg,
             "output": output,
-            "runtime": runtime,
         }
     )
 
@@ -86,21 +88,11 @@ class CoulombCalculatorBase:
         self,
         config_path=None,
         mode="ijij",
-        xsf_dir: str | None = None,
-        npy_dir: str | None = None,
-        seedname: str | None = None,
-        pattern_xsf: str | None = None,
-        pattern_npy: str | None = None,
     ):
         if mode not in ("ijij", "ijji"):
             raise ValueError("mode must be 'ijij' or 'ijji'")
         self.mode = mode
         self.config, self.config_file = load_config(config_path)
-        self._override_xsf_dir = xsf_dir
-        self._override_npy_dir = npy_dir
-        self._override_seedname = seedname
-        self._override_pattern_xsf = pattern_xsf
-        self._override_pattern_npy = pattern_npy
         # Shared initializations used by subclasses
         self.comm = mpi.world
         self.rank = self.comm.rank
@@ -109,29 +101,26 @@ class CoulombCalculatorBase:
         config = self.config
         self.paths_cfg = config.get("paths", {})
         self.interaction_cfg = config.get("interaction", {})
-        self.grid_cfg = config.get("grid", {})
         self.mpi_cfg = config.get("mpi", {})
         self.io_cfg = config.get("io", {})
 
         # Derived file paths and patterns
-        xsf_path = (self._override_xsf_dir or self.paths_cfg.get("xsf_dir", "")) + (
-            self._override_seedname or self.paths_cfg.get("seedname", "")
-        )
-        npy_path = (self._override_npy_dir or self.paths_cfg.get("npy_dir", "")) + (
-            self.paths_cfg.get("npy_prefix", "") or ""
-        )
-        pattern_xsf = self._override_pattern_xsf or self.io_cfg.get("xsf_glob", "*.xsf")
-        pattern_npy = self._override_pattern_npy or self.io_cfg.get("npy_glob", "*.npy")
+        default_dir = Path.cwd()
+        xsf_path = self.paths_cfg.get("xsf_dir", default_dir)
+        npy_path = self.paths_cfg.get("npy_dir", default_dir)
+        pattern_xsf = self.io_cfg.get("xsf_glob", "wannier90*.xsf")
+        pattern_npy = self.io_cfg.get("npy_glob", "wannier90*.npy")
 
-        self.npy_files = glob.glob(npy_path + pattern_npy)
+        self.npy_files = glob.glob(str(npy_path) + "/" + str(pattern_npy))
         self.npy_files.sort(key=lambda x: int(re.findall(r"\d+", x)[0]))
-        self.xsf_files = glob.glob(xsf_path + pattern_xsf)
+        self.xsf_files = glob.glob(str(xsf_path) + "/" + str(pattern_xsf))
+        self.xsf_files.sort(key=lambda x: int(re.findall(r"\d+", x)[0]))
         if self.npy_files == [] or self.xsf_files == []:
-            raise ValueError("No npy or xsf files found.")
+            raise ValueError(f"No npy or xsf files found in {xsf_path.expanduser()} or {npy_path.expanduser()} with pattern {pattern_xsf} or {pattern_npy}.")
 
-        self.Rx = int(self.interaction_cfg.get("Rx", 1))
-        self.Ry = int(self.interaction_cfg.get("Ry", 1))
-        self.Rz = int(self.interaction_cfg.get("Rz", 1))
+        self.Rx = int(self.interaction_cfg.get("Rx", 0))
+        self.Ry = int(self.interaction_cfg.get("Ry", 0))
+        self.Rz = int(self.interaction_cfg.get("Rz", 0))
 
         self.num_wann = len(self.npy_files)
 
