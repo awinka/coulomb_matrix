@@ -6,6 +6,7 @@ import os
 import argparse
 import glob
 import re
+import time
 import numpy as np
 from .xsf import Xsf2Np
 from .v_matrix import VCoulombCalculator
@@ -29,7 +30,7 @@ def xsf_to_npy(argv=None):
         return files
 
     def convert_file(path, out_prefix=None, out_dir=None, overwrite=False):
-        print(f"Processing file: {path}")
+        print(f"Processing file: {path}", flush=True)
         with open(path, "r") as f:
             xsf = Xsf2Np(f)
             wf = xsf.get_WF()
@@ -43,7 +44,7 @@ def xsf_to_npy(argv=None):
         else:
             out_path = name + ".npy"
         if (not overwrite) and os.path.exists(out_path):
-            print(f"Skip existing: {out_path}")
+            print(f"Skip existing: {out_path}", flush=True)
             return out_path
         np.save(out_path, wf)
         return out_path
@@ -63,50 +64,91 @@ def xsf_to_npy(argv=None):
 
 def coulomb_matrix(argv=None):
     """Run the packaged create_coulomb_matrix implementation."""
+    os.environ["OMP_NUM_THREADS"] = "1"  # GPAW warning suggests OMP_NUM_THREADS=1
     parser = argparse.ArgumentParser(description="Compute the Coulomb matrix (V) from Wannier functions.")
     parser.add_argument("--config", type=str, default=None, help="Path to TOML config file.")
     args = parser.parse_args(argv)
-    calc = VCoulombCalculator(config_path=args.config)
-    V = calc.run()
 
-    # save by rank 0
-    if not mpi.world.rank:
+    # Time calculation
+    if mpi.world.rank == 0:
+        start_time = time.time()
+        print("Starting calculation of Coulomb matrix...", flush=True)
+        # Time the initialization
+        init_start_time = time.time()
+        print("Initializing VCoulombCalculator...", flush=True)
+    calc = VCoulombCalculator(config_path=args.config)
+    mpi.world.barrier()  # Ensure all processes reach this point before timing
+    if mpi.world.rank == 0:
+        print(f"VCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds", flush=True)
+        # Time the run
+        print("Running VCoulombCalculator...", flush=True)
+        run_start_time = time.time()
+    V = calc.run()
+    mpi.world.barrier()  # Ensure all processes finish before timing
+    if mpi.world.rank == 0:
+        print(f"VCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds", flush=True)
+        # Time the save
+        print("Saving results...", flush=True)
+        save_start_time = time.time()
+
         output_cfg = calc.config.get("output", {})
         save_dir = output_cfg.get("save_dir", "./")
         try:
             os.makedirs(save_dir, exist_ok=True)
         except Exception:
             pass
-        filename = output_cfg.get("matrix_filename", "V_matrix.npy" if calc.mode == "V" else "J_matrix.npy")
+        filename = output_cfg.get("matrix_filename", "coulomb_matrix.npy")
         path = os.path.join(save_dir, filename)
         if output_cfg.get("use_unique_filenames", True):
             path = uniquify(path)
         np.save(path, V)
+        print(f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True)
+        print(f"Total time for Coulomb matrix calculation: {time.time() - start_time:.2f} seconds", flush=True)
     return 0
 
 
 def coulomb_exchange(argv=None):
     """Run the packaged create_exchange_matrix implementation."""
+    os.environ["OMP_NUM_THREADS"] = "1"  # GPAW warning suggests OMP_NUM_THREADS=1
     parser = argparse.ArgumentParser(description="Compute J Coulomb matrix")
-    parser.add_argument("--xsf-dir", default="./", help="Directory for xsf files")
-    parser.add_argument("--npy-dir", default="./", help="Directory for npy files")
+    # TODO: TOML should not be optional.
     parser.add_argument("--config", default=None, help="Optional TOML config file")
     args = parser.parse_args(argv)
-    calc = JCoulombCalculator(config_path=args.config, xsf_dir=args.xsf_dir, npy_dir=args.npy_dir)
-    V = calc.run()
 
-    # save by rank 0
-    if not mpi.world.rank:
+    # Time calculation
+    if mpi.world.rank == 0:
+        start_time = time.time()
+        print("Starting calculation of exchange Coulomb matrix...", flush=True)
+        # Time the initialization
+        init_start_time = time.time()
+        print("Initializing JCoulombCalculator...", flush=True)
+    calc = JCoulombCalculator(config_path=args.config)
+    mpi.world.barrier()  # Ensure all processes reach this point before timing
+    if mpi.world.rank == 0:
+        print(f"JCoulombCalculator initialized in {time.time() - init_start_time:.2f} seconds", flush=True)
+        # Time the run
+        print("Running JCoulombCalculator...", flush=True)
+        run_start_time = time.time()
+    V = calc.run()
+    mpi.world.barrier()  # Ensure all processes finish before timing
+    if mpi.world.rank == 0:
+        print(f"JCoulombCalculator ran in {time.time() - run_start_time:.2f} seconds", flush=True)
+        # Time the save
+        print("Saving results...", flush=True)
+        save_start_time = time.time()
+
         output_cfg = calc.config.get("output", {})
         save_dir = output_cfg.get("save_dir", "./")
         try:
             os.makedirs(save_dir, exist_ok=True)
         except Exception:
             pass
-        filename = output_cfg.get("matrix_filename", "V_matrix.npy" if calc.mode == "V" else "J_matrix.npy")
+        filename = output_cfg.get("matrix_filename", "exchange_matrix.npy")
         path = os.path.join(save_dir, filename)
         if output_cfg.get("use_unique_filenames", True):
             path = uniquify(path)
         np.save(path, V)
+        print(f"Results saved in {time.time() - save_start_time:.2f} seconds", flush=True)
+        print(f"Total time for exchange Coulomb matrix calculation: {time.time() - start_time:.2f} seconds", flush=True)
     return 0
 
