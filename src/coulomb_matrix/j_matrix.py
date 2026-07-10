@@ -4,14 +4,13 @@ Provides `JCoulombCalculator` and a `main()` entrypoint.
 """
 
 import numpy as np
-import gpaw.mpi as mpi
 from .coulomb_core import CoulombCalculatorBase
 from .eri_utils import load_and_normalize_wf, shift_WF, convert_to_ev
 
 
 class JCoulombCalculator(CoulombCalculatorBase):
     def __init__(self, *args, **kwargs):
-        kwargs.setdefault("mode", "J")
+        kwargs.setdefault("mode", "ijji")
         super().__init__(*args, **kwargs)
         self.prev_w_i = None
         self.prev_w_j = None
@@ -42,5 +41,6 @@ class JCoulombCalculator(CoulombCalculatorBase):
                 V[-shift[0], -shift[1], -shift[2], w_j, w_i] = V[shift[0], shift[1], shift[2], w_i, w_j]
                 shift_list.append(-shift)
 
-        mpi.world.sum(V)
-        return convert_to_ev(V)
+        self.comm.sum(V)
+        convert_to_ev(V)
+        return V
