@@ -151,13 +151,23 @@ class CoulombCalculatorBase:
         self.comm_poisson = self.comm.new_communicator(dist["comm_poisson_ranks"])
 
         # Build Poisson grid
-        with open(self.xsf_files[0], "r") as xsf:
-            wf_file = Xsf2Np(xsf)
-        self.pg = PoissonGrid(wf_file, self.comm_poisson, self.interaction_cfg, self.grid_cfg)
+        # Read one of the XSF files to get the grid descriptor for the Poisson solver
+        if self.comm.rank == 0:
+            with open(self.xsf_files[0], "r") as xsf:
+                wf_file = Xsf2Np(xsf, skip_wf=True)
+            lattice_vectors = wf_file.get_lattice_vectors()
+            supercell_vectors = wf_file.get_supercell()
+            real_space_grid = np.array(wf_file.get_real_space_grid())
+            self.comm.broadcast(lattice_vectors, 0)
+            self.comm.broadcast(supercell_vectors, 0)
+            self.comm.broadcast(real_space_grid, 0)
+        else:
+            lattice_vectors = self.comm.broadcast(None, 0)
+            supercell_vectors = self.comm.broadcast(None, 0)
+            real_space_grid = self.comm.broadcast(None, 0)
 
-        # Build Poisson solver
-        self.poisson = PoissonSolver(name="fast", nn=3)
-        self.poisson.set_grid_descriptor(self.GD)
+        # Very slow initialization, can I make it faster?
+        self.pg = PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, self.comm_poisson, self.interaction_cfg)
 
         # commonly used objects
         self.dV = self.pg.dV
@@ -170,6 +180,11 @@ class CoulombCalculatorBase:
         # so nearest neighbor interpolation should be sufficient. I believe it is faster than linear interpolation, 
         # but this should be tested.
         self.interp_method = "nearest" # or "linear"
+
+        # Build Poisson solver
+        # Very slow initialization, can I make it faster? 
+        self.poisson = PoissonSolver(name="fast", nn=3)
+        self.poisson.set_grid_descriptor(self.GD)
 
     def run(self):
         raise NotImplementedError("Subclasses must implement run().")
