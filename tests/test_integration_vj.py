@@ -43,7 +43,7 @@ def _make_files(tmpdir, num_wann=3, wf_shape=(4, 4, 4)):
 
 
 #@pytest.mark.integration
-@pytest.mark.parametrize("mode", ["ijij"]) #, "ijji"])
+@pytest.mark.parametrize("mode", ["ijij", "ijji"])
 def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     tmpdir = str(tmp_path)
     num_wann = 3
@@ -93,4 +93,4 @@ def test_v_and_j_run_consistent_across_pools(tmp_path, mode):
     # only assert on rank 0
     if rank == 0:
         for a in results[1:]:
-            assert True #np.allclose(a, results[0])
+            assert np.allclose(a, results[0])
