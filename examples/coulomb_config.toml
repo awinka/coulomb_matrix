@@ -1,0 +1,23 @@
+[paths]
+# Base directories (trailing slash recommended).
+xsf_dir = "./"
+npy_dir = "./"
+
+[output]
+save_dir = "."
+use_unique_filenames = false
+
+[interaction]
+# Neighbor interaction range in unit-cell steps.
+Rx = 1
+Ry = 0
+Rz = 0
+
+[mpi]
+# Number of Poisson pools for MPI distribution.
+number_poisson_pools = 1
+
+[io]
+# Patterns used to collect Wannier files.
+xsf_glob = "wannier90*.xsf"
+npy_glob = "wannier90*.npy"
