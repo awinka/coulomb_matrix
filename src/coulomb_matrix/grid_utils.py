@@ -3,7 +3,6 @@
 Provides `PoissonGrid` which computes Poisson grid sizing and offers an
 interpolation helper to map Wannier-function arrays onto the Poisson grid.
 """
-from typing import Dict
 import numpy as np
 from gpaw.grid_descriptor import GridDescriptor
 from ase.units import Bohr
@@ -14,22 +13,20 @@ class PoissonGrid:
     """Encapsulate Poisson-grid construction and interpolation helpers.
 
     Example:
-        pg = PoissonGrid(wf_file, comm_poisson, interaction_cfg, grid_cfg, mode='ijij')
+        pg = PoissonGrid(lattice_vectors, supercell_vectors, real_space_grid, comm_poisson, interaction_cfg)
         wf_on_poisson = pg.map_wf_to_poisson(wf_array, pg.grid, method='nearest')
     """
 
-    def __init__(self, wf_file, comm_poisson, interaction_cfg: dict, grid_cfg: dict, mode: str = "ijij"):
-        self.wf_file = wf_file
+    def __init__(self, lattice_vectors, supercell_vectors, real_space_grid, comm_poisson, interaction_cfg: dict):
+        self.lattice_vectors = lattice_vectors
         self.comm_poisson = comm_poisson
         self.interaction_cfg = interaction_cfg
-        self.grid_cfg = grid_cfg
-        self.mode = mode
 
-        self.unit_cell_vectors = wf_file.get_lattice_vectors() / Bohr
-        self.supercell_vectors = wf_file.get_supercell() / Bohr
+        self.unit_cell_vectors = lattice_vectors / Bohr
+        self.supercell_vectors = supercell_vectors / Bohr
         self.n_unit_cells = np.round(np.diag(self.supercell_vectors) / np.diag(self.unit_cell_vectors)).reshape((3, 1))
 
-        nx, ny, nz = wf_file.get_real_space_grid()
+        nx, ny, nz = real_space_grid
         self.wf_grid = np.array([nx, ny, nz])
         self.dV = np.linalg.det(self.unit_cell_vectors * self.n_unit_cells) / np.prod(self.wf_grid)
         self.n_grid_uc = np.int_(self.wf_grid / self.n_unit_cells[:, 0])
@@ -38,8 +35,10 @@ class PoissonGrid:
         Ry = int(interaction_cfg.get("Ry", 1))
         Rz = int(interaction_cfg.get("Rz", 1))
 
-        default_expand = [2 * Rx, 2 * Ry, 2 * Rz] if mode == "ijij" else [0, 0, 0]
-        self.poisson_expand = np.array(grid_cfg.get("poisson_expand", default_expand)).reshape(3, 1)
+        # NOTE: Size of the Poisson grid is dependent on the interaction range (Rx, Ry, Rz).
+        # In the future, we might want to make this more flexible or configurable.
+        default_expand = [2 * Rx, 2 * Ry, 2 * Rz]
+        self.poisson_expand = np.array(default_expand).reshape(3, 1)
         self.poisson_size = self.n_unit_cells.copy()
         self.poisson_size += self.poisson_expand
         self.poisson_size[self.poisson_size < 1] = 1
@@ -49,10 +48,12 @@ class PoissonGrid:
         self.GD = GridDescriptor(comm=comm_poisson, N_c=self.n_grid, cell_cv=self.unit_cell_vectors * self.poisson_size, pbc_c=True)
 
         X, Y, Z = self.GD.get_grid_point_coordinates()
-        self.grid_spacing = self.GD.h_cv
+        # Center the Poisson grid in the supercell, so that the origin is at the center of the supercell
         p_grid_shift = self.unit_cell_vectors * (self.n_unit_cells - self.poisson_size) / 2
         p_grid_shift = sum(p_grid_shift)
         grid = np.stack((X + p_grid_shift[0], Y + p_grid_shift[1], Z + p_grid_shift[2]), axis=-1)
+        # Go from real-space coordinates to index-space coordinates for interpolation.
+        self.grid_spacing = self.GD.h_cv
         self.grid = grid @ np.linalg.inv(self.grid_spacing)
 
         X_full, Y_full, Z_full = self.GD.get_grid_point_coordinates(global_array=True)
@@ -65,6 +66,9 @@ class PoissonGrid:
         The interpolator uses index-space coordinates defined by the WF grid
         (0..nx-1, 0..ny-1, 0..nz-1) as its domain.
         """
+        # Make sure the input WF array has the expected shape
+        if wf_array.shape != tuple(self.wf_grid):
+            raise ValueError(f"Expected wf_array shape {tuple(self.wf_grid)}, got {wf_array.shape}")
         nx_local, ny_local, nz_local = self.wf_grid
         interp = RegularGridInterpolator(
             (np.arange(nx_local), np.arange(ny_local), np.arange(nz_local)),
