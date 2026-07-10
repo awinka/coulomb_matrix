@@ -31,9 +31,9 @@ class PoissonGrid:
         self.dV = np.linalg.det(self.unit_cell_vectors * self.n_unit_cells) / np.prod(self.wf_grid)
         self.n_grid_uc = np.int_(self.wf_grid / self.n_unit_cells[:, 0])
 
-        Rx = int(interaction_cfg.get("Rx", 1))
-        Ry = int(interaction_cfg.get("Ry", 1))
-        Rz = int(interaction_cfg.get("Rz", 1))
+        Rx = int(interaction_cfg.get("Rx", 0))
+        Ry = int(interaction_cfg.get("Ry", 0))
+        Rz = int(interaction_cfg.get("Rz", 0))
 
         # NOTE: Size of the Poisson grid is dependent on the interaction range (Rx, Ry, Rz).
         # In the future, we might want to make this more flexible or configurable.
@@ -48,7 +48,7 @@ class PoissonGrid:
         self.GD = GridDescriptor(comm=comm_poisson, N_c=self.n_grid, cell_cv=self.unit_cell_vectors * self.poisson_size, pbc_c=True)
 
         X, Y, Z = self.GD.get_grid_point_coordinates()
-        # Center the Poisson grid in the supercell, so that the origin is at the center of the supercell
+        # Center the Poisson grid in the supercell, so that when interpolating the WF onto the Poisson grid, the WF is centered in the Poisson grid.
         p_grid_shift = self.unit_cell_vectors * (self.n_unit_cells - self.poisson_size) / 2
         p_grid_shift = sum(p_grid_shift)
         grid = np.stack((X + p_grid_shift[0], Y + p_grid_shift[1], Z + p_grid_shift[2]), axis=-1)
