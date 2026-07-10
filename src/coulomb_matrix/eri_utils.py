@@ -3,6 +3,7 @@
 
 Renamed for clarity and packaged under `coulomb_matrix.eri_utils`.
 """
+from ase.units import Bohr
 import numpy as np
 import os
 import gpaw.mpi as mpi
@@ -45,6 +46,15 @@ def load_and_normalize_wf(npy_file, dV):
         wf_loaded = np.load(npy)
         wf_loaded = wf_loaded / np.sqrt(np.vdot(wf_loaded.conj(), wf_loaded) * dV)
     return wf_loaded
+
+
+def convert_to_ev(V):
+    """Convert the Coulomb matrix V from atomic units to electron volts (eV)."""
+    V /= Bohr
+    epsilon_0 = 8.854187817e-12
+    e = 1.602176634e-19
+    conversion_factor = e / (4 * np.pi * epsilon_0) * 1e10
+    V *= conversion_factor
 
 
 if __name__ == "__main__":
