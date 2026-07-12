@@ -46,6 +46,14 @@ class PoissonGrid:
         Ry = int(interaction_cfg.get("Ry", 0))
         Rz = int(interaction_cfg.get("Rz", 0))
 
+        # Check that the interaction range is in a direction that is periodic. If not, raise an error.
+        if (Rx > 0 and self.n_unit_cells[0, 0] < 2) or (Ry > 0 and self.n_unit_cells[1, 0] < 2) or (
+            Rz > 0 and self.n_unit_cells[2, 0] < 2
+        ):
+            raise ValueError(
+                f"Interaction range (Rx={Rx}, Ry={Ry}, Rz={Rz}) is not compatible with the number of unit cells in the supercell (n_unit_cells={self.n_unit_cells.flatten()})."
+            )
+
         # NOTE: Size of the Poisson grid is dependent on the interaction range (Rx, Ry, Rz).
         # In the future, we might want to make this more flexible or configurable.
         default_expand = [2 * Rx, 2 * Ry, 2 * Rz]
