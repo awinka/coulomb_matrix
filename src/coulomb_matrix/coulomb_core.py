@@ -1,8 +1,8 @@
 """Shared Coulomb matrix computation core for `ijij` and `ijji` modes.
 
-This module provides `load_config` and `CoulombCalculatorBase` which
-encapsulates the common MPI/grid/IO setup. Mode-specific behavior is
-implemented as two helper methods inside the class.
+This module provides `CoulombCalculatorBase`, which encapsulates the common
+MPI/grid/IO setup. Mode-specific behavior is implemented as two helper methods
+inside the class.
 """
 import glob
 import re
@@ -10,79 +10,12 @@ from pathlib import Path
 
 import gpaw.mpi as mpi
 import numpy as np
-import tomllib
 from gpaw.poisson import PoissonSolver
 
+from .config import CoulombConfig
 from .grid_utils import PoissonGrid
 from .mpi_utils import compute_mpi_distribution
 from .xsf import Xsf2Np
-
-
-def load_config(config_path):
-    config_file = None
-    if config_path:
-        config_file = Path(config_path).expanduser().resolve()
-        if not config_file.exists():
-            raise FileNotFoundError(f"Config file not found: {config_file}")
-    else:
-        default_path = Path.cwd() / "coulomb_config.toml"
-        if default_path.exists():
-            config_file = default_path.resolve()
-
-    config_dir = config_file.parent if config_file else Path.cwd()
-
-    raw_config = {}
-    if config_file is not None:
-        with open(config_file, "rb") as f:
-            raw_config = tomllib.load(f)
-
-    config = raw_config
-
-    # Lightweight validation / normalization
-    interaction = config.get("interaction", {})
-    mpi_cfg = config.get("mpi", {})
-    paths = config.get("paths", {})
-    io_cfg = config.get("io", {})
-    output = config.get("output", {})
-
-    for key in ("Rx", "Ry", "Rz"):
-        if key in interaction:
-            interaction[key] = int(interaction[key])
-            if interaction[key] < 0:
-                raise ValueError(f"Config field 'interaction.{key}' must be >= 0.")
-        else:
-            interaction[key] = 0
-
-    # remove resolution handling; grids will be derived directly from XSF data
-
-    mpi_cfg["number_poisson_pools"] = int(mpi_cfg.get("number_poisson_pools", 1))
-    if mpi_cfg["number_poisson_pools"] < 1:
-        raise ValueError("Config field 'mpi.number_poisson_pools' must be >= 1.")
-
-    output["use_unique_filenames"] = bool(output.get("use_unique_filenames", False))
-
-    # Ensure paths strings exist (may be empty if user relies on defaults)
-    for section in (paths, output):
-        for k, v in list(section.items()):
-            if isinstance(v, str):
-                # section[k] = Path(v).expanduser().resolve() if v else config_dir
-                section[k] = Path(v) if v else config_dir
-                if not section[k].is_absolute():
-                    # Join the config folder path with the relative path, then normalize it
-                    absolute_input_path = (config_dir / section[k]).resolve()
-                    section[k] = absolute_input_path
-
-    config.update(
-        {
-            "interaction": interaction,
-            "mpi": mpi_cfg,
-            "paths": paths,
-            "io": io_cfg,
-            "output": output,
-        }
-    )
-
-    return config, config_file
 
 
 class CoulombCalculatorBase:
@@ -94,24 +27,22 @@ class CoulombCalculatorBase:
         if mode not in ("ijij", "ijji"):
             raise ValueError("mode must be 'ijij' or 'ijji'")
         self.mode = mode
-        self.config, self.config_file = load_config(config_path)
+        self.config, self.config_file = CoulombConfig.from_toml(config_path)
         # Shared initializations used by subclasses
         self.comm = mpi.world
         self.rank = self.comm.rank
         self.mpi_size = self.comm.size
 
-        config = self.config
-        self.paths_cfg = config.get("paths", {})
-        self.interaction_cfg = config.get("interaction", {})
-        self.mpi_cfg = config.get("mpi", {})
-        self.io_cfg = config.get("io", {})
+        self.paths_cfg = self.config.paths
+        self.interaction_cfg = self.config.interaction
+        self.mpi_cfg = self.config.mpi
+        self.io_cfg = self.config.io
 
         # Derived file paths and patterns
-        default_dir = Path.cwd()
-        xsf_path = self.paths_cfg.get("xsf_dir", default_dir)
-        npy_path = self.paths_cfg.get("npy_dir", default_dir)
-        pattern_xsf = self.io_cfg.get("xsf_glob", "wannier90*.xsf")
-        pattern_npy = self.io_cfg.get("npy_glob", "wannier90*.npy")
+        xsf_path = self.paths_cfg.xsf_dir
+        npy_path = self.paths_cfg.npy_dir
+        pattern_xsf = self.io_cfg.xsf_glob
+        pattern_npy = self.io_cfg.npy_glob
 
         self.npy_files = glob.glob(str(npy_path) + "/" + str(pattern_npy))
         self.npy_files.sort(key=lambda x: int(re.findall(r"\d+", x)[0]))
@@ -122,9 +53,9 @@ class CoulombCalculatorBase:
                 f"No npy or xsf files found in {xsf_path.expanduser()} or {npy_path.expanduser()} with pattern {pattern_xsf} or {pattern_npy}."
             )
 
-        self.Rx = int(self.interaction_cfg.get("Rx", 0))
-        self.Ry = int(self.interaction_cfg.get("Ry", 0))
-        self.Rz = int(self.interaction_cfg.get("Rz", 0))
+        self.Rx = self.interaction_cfg.Rx
+        self.Ry = self.interaction_cfg.Ry
+        self.Rz = self.interaction_cfg.Rz
 
         self.num_wann = len(self.npy_files)
 
@@ -132,7 +63,7 @@ class CoulombCalculatorBase:
             mpi_size=self.mpi_size,
             rank=self.rank,
             num_wann=self.num_wann,
-            n_poisson_pools=int(self.mpi_cfg.get("number_poisson_pools", 1)),
+            n_poisson_pools=self.mpi_cfg.number_poisson_pools,
             mode=self.mode,
         )
 

@@ -8,6 +8,8 @@ from ase.units import Bohr
 from gpaw.grid_descriptor import GridDescriptor
 from scipy.interpolate import RegularGridInterpolator
 
+from .config import InteractionConfig
+
 
 class PoissonGrid:
     """Encapsulate Poisson-grid construction and interpolation helpers.
@@ -23,7 +25,7 @@ class PoissonGrid:
         supercell_vectors,
         real_space_grid,
         comm_poisson,
-        interaction_cfg: dict,
+        interaction_cfg: InteractionConfig,
     ):
         self.lattice_vectors = lattice_vectors
         self.comm_poisson = comm_poisson
@@ -42,13 +44,15 @@ class PoissonGrid:
         )
         self.n_grid_uc = np.int_(self.wf_grid / self.n_unit_cells[:, 0])
 
-        Rx = int(interaction_cfg.get("Rx", 0))
-        Ry = int(interaction_cfg.get("Ry", 0))
-        Rz = int(interaction_cfg.get("Rz", 0))
+        Rx = interaction_cfg.Rx
+        Ry = interaction_cfg.Ry
+        Rz = interaction_cfg.Rz
 
         # Check that the interaction range is in a direction that is periodic. If not, raise an error.
-        if (Rx > 0 and self.n_unit_cells[0, 0] < 2) or (Ry > 0 and self.n_unit_cells[1, 0] < 2) or (
-            Rz > 0 and self.n_unit_cells[2, 0] < 2
+        if (
+            (Rx > 0 and self.n_unit_cells[0, 0] < 2)
+            or (Ry > 0 and self.n_unit_cells[1, 0] < 2)
+            or (Rz > 0 and self.n_unit_cells[2, 0] < 2)
         ):
             raise ValueError(
                 f"Interaction range (Rx={Rx}, Ry={Ry}, Rz={Rz}) is not compatible with the number of unit cells in the supercell (n_unit_cells={self.n_unit_cells.flatten()})."

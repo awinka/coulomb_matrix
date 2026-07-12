@@ -120,15 +120,15 @@ def coulomb_matrix(argv=None):
         print("Saving results...", flush=True)
         save_start_time = time.time()
 
-        output_cfg = calc.config.get("output", {})
-        save_dir = output_cfg.get("save_dir", "./")
+        output_cfg = calc.config.output
+        save_dir = output_cfg.save_dir
         try:
             os.makedirs(save_dir, exist_ok=True)
         except Exception:
             pass
-        filename = output_cfg.get("matrix_filename", "coulomb_matrix.npy")
+        filename = output_cfg.matrix_filename
         path = os.path.join(save_dir, filename)
-        if output_cfg.get("use_unique_filenames", True):
+        if output_cfg.use_unique_filenames:
             path = uniquify(path)
         np.save(path, V)
         print(
@@ -177,15 +177,15 @@ def coulomb_exchange(argv=None):
         print("Saving results...", flush=True)
         save_start_time = time.time()
 
-        output_cfg = calc.config.get("output", {})
-        save_dir = output_cfg.get("save_dir", "./")
+        output_cfg = calc.config.output
+        save_dir = output_cfg.save_dir
         try:
             os.makedirs(save_dir, exist_ok=True)
         except Exception:
             pass
-        filename = output_cfg.get("matrix_filename", "exchange_matrix.npy")
+        filename = output_cfg.exchange_matrix_filename
         path = os.path.join(save_dir, filename)
-        if output_cfg.get("use_unique_filenames", True):
+        if output_cfg.use_unique_filenames:
             path = uniquify(path)
         np.save(path, V)
         print(

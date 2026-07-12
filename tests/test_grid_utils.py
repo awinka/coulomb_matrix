@@ -8,6 +8,8 @@ The tests here are only for the non-MPI parts of the code.
 """
 import numpy as np
 
+from coulomb_matrix.config import InteractionConfig
+
 
 class _FakeGD:
     def __init__(self, comm, N_c, cell_cv, pbc_c=True):
@@ -35,7 +37,7 @@ def test_poissongrid_basic_properties(monkeypatch):
     supercell_vectors = np.eye(3) * 2.0
     real_space_grid = (4, 4, 4)
     comm = None
-    interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
+    interaction_cfg = InteractionConfig(Rx=1, Ry=1, Rz=1)
 
     pg = gu.PoissonGrid(
         lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
@@ -57,7 +59,7 @@ def test_map_wf_to_poisson_nearest_preserves_point(monkeypatch):
     supercell_vectors = np.eye(3) * 2.0
     real_space_grid = (6, 6, 6)
     comm = None
-    interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
+    interaction_cfg = InteractionConfig(Rx=1, Ry=1, Rz=1)
     pg = gu.PoissonGrid(
         lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
     )
@@ -84,7 +86,7 @@ def test_map_wf_to_poisson_out_of_bounds_fills_zero(monkeypatch):
     supercell_vectors = np.eye(3) * 2.0
     real_space_grid = (4, 4, 4)
     comm = None
-    interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
+    interaction_cfg = InteractionConfig(Rx=1, Ry=1, Rz=1)
     pg = gu.PoissonGrid(
         lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
     )
@@ -112,7 +114,7 @@ def test_map_local_to_global():
     supercell_vectors = np.eye(3) * 2.0
     real_space_grid = (4, 4, 4)
     comm = mpi.world
-    interaction_cfg = {"Rx": 1, "Ry": 1, "Rz": 1}
+    interaction_cfg = InteractionConfig(Rx=1, Ry=1, Rz=1)
     pg = gu.PoissonGrid(
         lattice_vectors, supercell_vectors, real_space_grid, comm, interaction_cfg
     )
