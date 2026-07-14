@@ -10,10 +10,12 @@ authors = [ { name="A. Winka" } ]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy",
-    "scipy",
-    "ase",
-    "gpaw",
+    "numpy==1.26.4",
+    "scipy==1.15.1",
+    "ase==3.24.0",
+    "gpaw==24.6.0",
+    "pytest==9.1.1",
+    "tomli-w==1.2.0",
 ]
 
 # entry-points table
@@ -38,6 +40,5 @@ dev = [
     "pytest",
     "pytest-cov",
     "tomli-w",
-    "mpi4py",
     "just",
 ]

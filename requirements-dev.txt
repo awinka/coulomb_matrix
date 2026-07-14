@@ -6,5 +6,4 @@ flake8
 pytest
 pytest-cov
 tomli-w
-mpi4py
 just

@@ -1,4 +1,6 @@
-numpy
-scipy
-ase
-gpaw
+ase==3.24.0
+gpaw==24.6.0
+numpy==1.26.4
+pytest==9.1.1
+scipy==1.15.1
+tomli_w==1.2.0
