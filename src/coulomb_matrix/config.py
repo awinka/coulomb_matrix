@@ -11,8 +11,6 @@ Sections:
 - io: glob patterns used to discover Wannier files
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field, fields, is_dataclass, MISSING
 from pathlib import Path
 from typing import Any, Mapping
@@ -240,7 +238,7 @@ class CoulombConfig:
                 lines.append(f"  {f.name} [{type_name}]{default_str}")
                 lines.append(f"        {help_text}\n")
 
-        return "\n".join(lines).strip()
+        return "\n".join(lines)
     
     @classmethod
     def from_dict(
