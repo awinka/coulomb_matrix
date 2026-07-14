@@ -11,6 +11,7 @@ import time
 import gpaw.mpi as mpi
 import numpy as np
 
+from .config import CoulombConfig
 from .eri_utils import uniquify
 from .j_matrix import JCoulombCalculator
 from .v_matrix import VCoulombCalculator
@@ -90,7 +91,18 @@ def coulomb_matrix(argv=None):
     parser.add_argument(
         "--config", type=str, default=None, help="Path to TOML config file."
     )
+    parser.add_argument(
+        "--help-config", 
+        action="store_true", 
+        help="Show detailed help for all TOML configuration parameters and exit."
+    )
     args = parser.parse_args(argv)
+
+    # Intercept early if config help is requested before any MPI/Calculator overhead
+    if args.help_config:
+        if mpi.world.rank == 0:
+            print(CoulombConfig.get_help_text())
+        return 0
 
     # Time calculation
     if mpi.world.rank == 0:
@@ -147,7 +159,18 @@ def coulomb_exchange(argv=None):
     parser = argparse.ArgumentParser(description="Compute J Coulomb matrix")
     # TODO: TOML should not be optional.
     parser.add_argument("--config", default=None, help="Optional TOML config file")
+    parser.add_argument(
+        "--help-config", 
+        action="store_true", 
+        help="Show detailed help for all TOML configuration parameters and exit."
+    )
     args = parser.parse_args(argv)
+
+    # Intercept early
+    if args.help_config:
+        if mpi.world.rank == 0:
+            print(CoulombConfig.get_help_text())
+        return 0
 
     # Time calculation
     if mpi.world.rank == 0:

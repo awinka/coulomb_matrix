@@ -13,7 +13,7 @@ Sections:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass, MISSING
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -200,6 +200,48 @@ class CoulombConfig:
     mpi: MpiConfig = field(metadata={"help": "MPI scheduling settings."})
     io: IoConfig = field(metadata={"help": "File-discovery patterns."})
 
+    @classmethod
+    def get_help_text(cls, target_cls: Any = None, prefix: str = "") -> str:
+        """Recursively generates a help menu from the configuration schema."""
+        if target_cls is None:
+            target_cls = cls
+
+        lines = []
+        if not prefix:
+            lines.append("Available TOML Configuration Options:")
+            lines.append("=" * 37 + "\n")
+
+        for f in fields(target_cls):
+            # Formulate the TOML path (e.g., paths.xsf_dir)
+            current_path = f"{prefix}.{f.name}" if prefix else f.name
+
+            if is_dataclass(f.type):
+                section_help = f.metadata.get("help", "Configuration section.")
+                lines.append(f"[{current_path}]")
+                lines.append(f"    {section_help}\n")
+                # Recurse down into the nested dataclass
+                lines.append(cls.get_help_text(f.type, prefix=current_path))
+            else:
+                help_text = f.metadata.get("help", "No description provided.")
+                if f.default == MISSING:
+                    default_str = " (Required)"
+                else:
+                    # Formats strings with quotes, booleans nicely, etc.
+                    default_str = f" (Default: {repr(f.default)})"
+
+                # Get the type name safely whether it's a class or a string
+                if isinstance(f.type, str):
+                    type_name = f.type
+                elif hasattr(f.type, "__name__"):
+                    type_name = f.type.__name__
+                else:
+                    type_name = str(f.type) # Fallback for complex types like List[str] or Optional[int]
+
+                lines.append(f"  {f.name} [{type_name}]{default_str}")
+                lines.append(f"        {help_text}\n")
+
+        return "\n".join(lines).strip()
+    
     @classmethod
     def from_dict(
         cls, raw_config: Mapping[str, Any] | None, config_dir: Path
