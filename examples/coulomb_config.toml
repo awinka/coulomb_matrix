@@ -1,23 +1,33 @@
 [paths]
-# Base directories (trailing slash recommended).
-xsf_dir = "./"
-npy_dir = "./"
+# Base directories for the Wannier input files.
+# These may be absolute paths or paths relative to this config file.
+xsf_dir = "input-files"
+npy_dir = "input-files"
 
 [output]
-save_dir = "."
+# Directory where the resulting matrix is written.
+save_dir = "outputs"
+# Filename used by the Coulomb-matrix command.
+matrix_filename = "coulomb_matrix.npy"
+# Filename used by the exchange-matrix command.
+exchange_matrix_filename = "exchange_matrix.npy"
+# If true, existing output names are uniquified before saving.
 use_unique_filenames = false
 
 [interaction]
 # Neighbor interaction range in unit-cell steps.
-Rx = 1
+# Rx/Ry/Rz control how many neighboring cells are included in each direction.
+Rx = 0
 Ry = 0
-Rz = 0
+Rz = 3
 
 [mpi]
 # Number of Poisson pools for MPI distribution.
+# Larger values split the work across more Poisson-solver groups.
 number_poisson_pools = 1
 
 [io]
-# Patterns used to collect Wannier files.
+# Glob patterns used to collect Wannier files.
+# Keep these aligned with the naming scheme used in your generated data.
 xsf_glob = "wannier90*.xsf"
 npy_glob = "wannier90*.npy"

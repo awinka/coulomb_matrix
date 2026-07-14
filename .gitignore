@@ -28,6 +28,10 @@ env/
 # pytest cache
 .pytest_cache/
 
+# examples output
+examples/outputs/*.npy
+examples/input-files/*.npy
+
 # Jupyter
 .ipynb_checkpoints/
 
